@@ -2,6 +2,7 @@
 ## DISTANCE TO NEAREST GAP 1/2 PA; POP CALC ##
 ##############################################
 
+## ** IN US, DOESN'T INCLUDE CIUDAD JUAREZ ** ##
 
 padus <- st_read("G:/My Drive/1Data/PADUS_2_1/PAD_US2_1.gdb",
               layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
@@ -49,7 +50,22 @@ pa_txnm_gap12$SHAPE_Area[1:50] # already in shapefile
 pa_txnm_gap12 <- pa_txnm_gap12[pa_txnm_gap12$SHAPE_Area / 1000000 > 30,]
 pa_cntr <- st_centroid(pa_txnm_gap12)
 
-dist <- as.numeric(c(st_distance(cr_cntr, pa_cntr)/1000))
-min(dist) # now 50km
+dist_km <- as.numeric(c(st_distance(cr_cntr, pa_cntr)/1000))
+min(dist_km) # now 50km
+dist_mi <- dist_km/(m_mi/1000)
+min(dist_mi)
+
+# The nearest PA had been 30mi away. For ppl w/in 10mi proposed NM, that's 30-10=20 mi closer on avg.
+# How many people are in there? Look at hispanic w > natl median HM.
+# sCale pop #s by proportion of original tract that's represneted w/in 10 mile buffer.
+
+# Hispanic
+txnm_10mi$AHZAE012_new <- round(txnm_10mi$AHZAE012*txnm_10mi$prop_ttl_area,0)
+
+txnm_10mi$AHZAE012[1:10]
+txnm_10mi$AHZAE012_new[1:10]
+
+sum(txnm_10mi$AHZAE012_new[txnm_10mi$hm > hm_natl_med], na.rm = TRUE)
+
 
 
