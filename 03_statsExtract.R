@@ -3,6 +3,8 @@
 ## CENSUS STAT EXTRACTION AND SUMMARIZING ##
 ############################################
 
+## ** IN US, DOESN'T INCLUDE CIUDAD JUAREZ ** ##
+
 ## Buffer proposed nat'l monument at multiple intervals. Currently m but set to latlong
 m_mi <- 1609
 
@@ -39,19 +41,24 @@ txnm_25mi <- st_intersection(buff_25mi, txnm)
 txnm_50mi <- st_intersection(buff_50mi, txnm)
 
 
-# Compute new areas to account for partial census tracts
+# Compute new areas to account for partial census tracts.
 txnm_10mi$area_km2_new <- terra::area(as_Spatial(txnm_10mi)) / 1000000
 txnm_25mi$area_km2_new <- terra::area(as_Spatial(txnm_25mi)) / 1000000
 txnm_50mi$area_km2_new <- terra::area(as_Spatial(txnm_50mi)) / 1000000
 
+# Compute the proportion of the original tract area that new portion represents.
+# This will be used to scale population numbers within each.
 txnm_10mi$area_km2[1:10]
 txnm_10mi$area_km2_new[1:10]
+txnm_10mi$prop_ttl_area <- txnm_10mi$area_km2_new/txnm_10mi$area_km2
 
 txnm_25mi$area_km2[125:150]
 txnm_25mi$area_km2_new[125:150]
+txnm_25mi$prop_ttl_area <- txnm_25mi$area_km2_new/txnm_25mi$area_km2
 
 txnm_50mi$area_km2[150:200]
 txnm_50mi$area_km2_new[150:200]
+txnm_50mi$prop_ttl_area <- txnm_50mi$area_km2_new/txnm_50mi$area_km2
 
 
 
