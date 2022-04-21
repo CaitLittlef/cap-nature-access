@@ -2,8 +2,32 @@
 ## DISTANCE TO NEAREST GAP 1/2 PA; POP CALC ##
 ##############################################
 
-## ** IN US, DOESN'T INCLUDE CIUDAD JUAREZ ** ##
 
+##--------------------------------------------
+## REMEMBER THE UNIVERSE YOU'RE DEALING WITH!! 
+# Race alone - total pop
+# Income - households*
+# children - families SOMETIMES subset by race.
+
+# * Vincent's code (lines 63 & 74 in utils.R) suggests
+# how income-based tracts are defined & compared 
+# use population-level values and NOT household
+# baselines, which I don't think is correct 
+# based on the source of income data:
+# data_source_tabular_census_nhgis0024_ds233_20175_2017_tract_codebook.txt
+
+# Stick with tracts defined as they are,
+# but when computing total # individuals or 
+# total # households, use households/families?
+
+# OR don't worry about computing number of ppl split by race...
+# Just do # of ppl who fall within a particular status grp.
+
+##--------------------------------------------
+
+
+
+## CHANGE TO C:\Users\clitt\OneDrive\Desktop\data_gen\PADUS_2_1
 padus <- st_read("G:/My Drive/1Data/PADUS_2_1/PAD_US2_1.gdb",
               layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
 
