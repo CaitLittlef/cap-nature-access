@@ -3,31 +3,33 @@
 ## CENSUS STAT EXTRACTION AND SUMMARIZING ##
 ############################################
 
-## ** IN US, DOESN'T INCLUDE CIUDAD JUAREZ ** ##
+# Select AOI
+d <- cr ; s <- txnm; loc = "Castner Range" ; print("Castner Range selected.")
+# d <- aka ; s <- nvca; loc = "Avi Kwa Ame" ; print("Avi Kwa Ame selected.")
+
 
 ## Buffer proposed nat'l monument at multiple intervals. Currently m but set to latlong
-m_mi <- 1609
+m_in_mi <- 1609
 
-buff_10mi <- st_buffer(cr, 10*m_mi)
-buff_25mi <- st_buffer(cr, 25*m_mi)
-buff_50mi <- st_buffer(cr, 50*m_mi)
+b1 <- st_buffer(d, 10*m_in_mi) ; buff_1_size = "10 miles"
+b2 <- st_buffer(d, 25*m_in_mi) ; buff_1_size = "25 miles"
+b3 <- st_buffer(d, 50*m_in_mi) ; buff_1_size = "50 miles"
 
-plot(buff_50mi)
-plot(buff_25mi, add = TRUE)
-plot(buff_10mi, add = TRUE)
-plot(cr, add = TRUE)
+plot(b3)
+plot(b2, add = TRUE)
+plot(b1, add = TRUE)
+plot(d, add = TRUE)
 
 
-## Extract census tracts within each buffer.
-# First, ensure existing sqkm calcs are correct.
-# B/c for partial census tracts within a given buffer, we'll scale # ppl.
 
-area_sqkm <- terra::area(as_Spatial(txnm)) / 1000000
-txnm$area_km2[1:50] # already in shapefile
+## Find census tracts that intersect w each buffer.
+
+# 1st, ensure existing sqkm is correct to use to weight #ppl for partial tracts.
+area_sqkm <- terra::area(as_Spatial(s)) / 1000000
+s$area_km2[1:50] # already in shapefile
 area_sqkm[1:50]
-identical(round(txnm$area_km2,2), round(area_sqkm,2))
-# TRUE. Rounded to the 100th sqkm, that's close enough.
-txnm$area_sqkm <- NULL
+identical(round(txnm$area_km2,2), round(area_sqkm,2)) # TRUE
+s$area_sqkm <- NULL
 
 # Initial intersection threw this error
   # Error in s2_geography_from_wkb(x, oriented = oriented, check = check) : 
@@ -36,36 +38,38 @@ txnm$area_sqkm <- NULL
 # Advised on github: sf_use_s2(FALSE)
 sf_use_s2(FALSE)
 
-txnm_10mi <- st_intersection(buff_10mi, txnm)
-txnm_25mi <- st_intersection(buff_25mi, txnm)
-txnm_50mi <- st_intersection(buff_50mi, txnm)
-
+s_b1 <- st_intersection(buff_1, s)
+s_b2 <- st_intersection(buff_2, s)
+s_b3 <- st_intersection(buff_3, s)
 
 # Compute new areas to account for partial census tracts.
-txnm_10mi$area_km2_new <- terra::area(as_Spatial(txnm_10mi)) / 1000000
-txnm_25mi$area_km2_new <- terra::area(as_Spatial(txnm_25mi)) / 1000000
-txnm_50mi$area_km2_new <- terra::area(as_Spatial(txnm_50mi)) / 1000000
+s_b1$area_km2_new <- terra::area(as_Spatial(s_b1)) / 1000000
+s_b2$area_km2_new <- terra::area(as_Spatial(s_b2)) / 1000000
+s_b3$area_km2_new <- terra::area(as_Spatial(s_b3)) / 1000000
 
-# Compute the proportion of the original tract area that new portion represents.
+# Compute the proportion of the original tract area the new portion represents.
 # This will be used to scale population numbers within each.
-txnm_10mi$area_km2[1:10]
-txnm_10mi$area_km2_new[1:10]
-txnm_10mi$prop_ttl_area <- txnm_10mi$area_km2_new/txnm_10mi$area_km2
-
-txnm_25mi$area_km2[125:150]
-txnm_25mi$area_km2_new[125:150]
-txnm_25mi$prop_ttl_area <- txnm_25mi$area_km2_new/txnm_25mi$area_km2
-
-txnm_50mi$area_km2[150:200]
-txnm_50mi$area_km2_new[150:200]
-txnm_50mi$prop_ttl_area <- txnm_50mi$area_km2_new/txnm_50mi$area_km2
+# Visual check to make sure many match. 
+# round(s_b1$area_km2[1:30],2) ; round(s_b1$area_km2_new[1:30],2)
+# round(s_b2$area_km2[125:150],2) ; round(s_b2$area_km2_new[125:150],2)
+# round(s_b3$area_km2[125:150],2) ; round(s_b3$area_km2_new[125:150],2)
+s_b1$prop_ttl_area <- s_b1$area_km2_new/s_b1$area_km2 ; Mode(round(s_b1$prop_ttl_area, 4))
+s_b2$prop_ttl_area <- s_b2$area_km2_new/s_b2$area_km2 ; Mode(round(s_b2$prop_ttl_area, 4))
+s_b3$prop_ttl_area <- s_b3$area_km2_new/s_b3$area_km2 ; Mode(round(s_b3$prop_ttl_area, 4))
 
 
+## Compare to state-level and national hm and hm-energy values.
+# Tracts_ind represent total pop (per functions in util.R) 
+(hm_natl_mean <- hm_natl$hm_mean[hm_natl$status_group == "tracts_ind"])
+(hme_natl_mean <- hm_natl$hm_energy_mean[hm_natl$status_group == "tracts_ind"])
 
-## Compare to state-level and national hm values
-(hm_natl_med <- hm_natl$hm_mean[hm_natl$status_group == "tracts_ind"])
-(hm_tx_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Texas"])
-(hm_nm_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "New Mexico"])
+# Pull state names to use as filter.
+f <- unique(s$STATE)
+
+hm_s1_mean <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == f[1]]
+hm_s2_mean <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == f[2]]
+hme_s1_mean <- hm_st$hm_energy_mean[hm_st$status_group == "tracts_ind" & hm_st$state == f[1]]
+hme_s2_mean <- hm_st$hm_energy_mean[hm_st$status_group == "tracts_ind" & hm_st$state == f[2]]
 
 
 ## What prop non-white tracts within 50 miles of Caster Range have > natl median hm?
