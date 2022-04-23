@@ -2,11 +2,18 @@
 ## SETUP ##
 ###########
 
+
+today <- paste0(mid(Sys.Date(),3,2),
+                mid(Sys.Date(),6,2),
+                mid(Sys.Date(),9,2))
+
+
 #####################################
 ## Set working directory 
 setwd("G:/My Drive/2CAPNatureAccess/CAPNatureAccess/")
 wd <- "G:/My Drive/2CAPNatureAccess/CAPNatureAccess/"
 data.dir <- "G:/My Drive/2CAPNatureAccess/CAPNatureAccess/data/"
+out.dir <- "G:/My Drive/2CAPNatureAccess/CAPNatureAccess/output/"
 
 
 
