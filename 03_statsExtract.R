@@ -21,29 +21,28 @@
 
 
 
-
 ##---------------------------------------------------------------------
 
 ## Create buffers around AOI and extract census tract data therein
 
 m_in_mi <- 1609
-
 # Select AOI and associated buffer sizes
-d <- cr ; s <- txnm; loc = "Castner Range" ; print("Castner Range selected.")
-b1 <- st_buffer(d, 10*m_in_mi) ; b1_size = "10mi"
-b2 <- st_buffer(d, 25*m_in_mi) ; b2_size = "25mi"
-b3 <- st_buffer(d, 50*m_in_mi) ; b3_size = "50mi"
-# 
-# d <- aka ; s <- nvca; loc = "AviKwaAme" ; print("Avi Kwa Ame selected.")
-# b1 <- st_buffer(d, 25*m_in_mi) ; b1_size = "25mi"
-# b2 <- st_buffer(d, 50*m_in_mi) ; b2_size = "50mi"
-# b3 <- st_buffer(d, 100*m_in_mi) ; b3_size = "100mi"
+# # --------------
+# d <- cr ; s <- txnm; loc = "Castner Range" ; print("Castner Range selected.")
+# b1 <- st_buffer(d, 10*m_in_mi) ; b1_size = "10mi"
+# b2 <- st_buffer(d, 25*m_in_mi) ; b2_size = "25mi"
+# b3 <- st_buffer(d, 50*m_in_mi) ; b3_size = "50mi"
+# # -------------- 
+d <- aka ; s <- nvca; loc = "AviKwaAme" ; print("Avi Kwa Ame selected.")
+b1 <- st_buffer(d, 25*m_in_mi) ; b1_size = "25mi"
+b2 <- st_buffer(d, 50*m_in_mi) ; b2_size = "50mi"
+b3 <- st_buffer(d, 100*m_in_mi) ; b3_size = "100mi"
+# # --------------
 
-
-plot(b3)
-plot(b2, add = TRUE)
-plot(b1, add = TRUE)
-plot(d, add = TRUE)
+# plot(b3)
+# plot(b2, add = TRUE)
+# plot(b1, add = TRUE)
+# plot(d, add = TRUE)
 
 
 ## Find census tracts that intersect w each buffer.
@@ -79,24 +78,33 @@ s_b1$prop_ttl_area <- s_b1$area_km2_new/s_b1$area_km2 ; Mode(round(s_b1$prop_ttl
 s_b2$prop_ttl_area <- s_b2$area_km2_new/s_b2$area_km2 ; Mode(round(s_b2$prop_ttl_area, 4))
 s_b3$prop_ttl_area <- s_b3$area_km2_new/s_b3$area_km2 ; Mode(round(s_b3$prop_ttl_area, 4))
 
-# Drop geometries to shrink size for looping
-s_b1_df <- s_b1 ; s_b1_df$geometry <- NULL
-s_b2_df <- s_b2 ; s_b2_df$geometry <- NULL
-s_b3_df <- s_b3 ; s_b3_df$geometry <- NULL
+
+## --------------------------------------------------------------------
+
+# Which zone? Turn on/off.
+zone <- s_b1 ; (buffer <- b1_size)
+# zone <- s_b2 ; (buffer <- b2_size)
+# zone <- s_b3 ; (buffer <- b3_size)
+
+# Eliminate any rows that have zero ppl else get NA rows when subsetting. 
+zone <- zone[zone$AHY2E001 > 0,]
+
+# Pull state abbreviations for selecting PAs 
+(states <- unique(zone$STATE))
+(states_abb <- if("Texas" %in% states) c("NM", "TX") else c("CA", "NV"))
+
+# Source code that calcs dist to nearest PA for each tract and adds to shapefile.
+source(paste0(wd, "analyses/cap-nature-access/04_distPA.R"), echo = FALSE)
+
+# set geom to null for faster looping
+zone_df <- zone ; zone_df$geometry <- NULL
 
 
 
 ## --------------------------------------------------------------------------
+
+
 ## What prop of status grp tracts and what # of ppl/families have hm >avg?
-
-
-# Which zone? Turn on/off
-# zone <- s_b1_df ; buffer <- b1_size
-# zone <- s_b2_df ; (buffer <- b2_size)
-zone <- s_b3_df ; buffer <- b3_size
-# Eliminate any rows that have zero ppl else get NA rows when subsetting. 
-zone <- zone[zone$AHY2E001 > 0,]
-
 
 # Create empty vectors for dumping values
 stat_grp <- as.character()
@@ -108,11 +116,15 @@ num_gt_hm_natl <- as.numeric()
 prop_tracts_gt_hme_natl <- as.numeric()
 num_gt_hme_natl <- as.numeric()
 
-# Human mod (all & energy) - state
-prop_tracts_gt_hm_st <- as.numeric()
-num_gt_hm_st <- as.numeric()
-prop_tracts_gt_hme_st <- as.numeric()
-num_gt_hme_st <- as.numeric()
+# # Human mod (all & energy) - state
+# prop_tracts_gt_hm_st <- as.numeric()
+# num_gt_hm_st <- as.numeric()
+# prop_tracts_gt_hme_st <- as.numeric()
+# num_gt_hme_st <- as.numeric()
+
+# Distance to nearest PA
+pa_dist_mi_gt_hm <- as.numeric()
+pa_dist_mi_gt_hme <- as.numeric()
 
 # Grab list of status groups, nixing baseline grps (tracts_ind, tracts_fam)
 (stat_grps <- c(unique(hm_st$status_group)))
@@ -147,7 +159,7 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   hme_base <- hm_natl$hm_energy_mean[hm_natl$status_group == unit]
   
   # Pull tracts in status grp w hm/hme > avg; row of NAs may be returned b/c of other NAs in df
-  all <- zone[zone[grp] == 1,] 
+  all <- zone_df[zone_df[grp] == 1,] 
   sel_hm <- all[all$hm > hm_base,]
   sel_hme <- all[all$hm_energy > hme_base,]
   
@@ -182,6 +194,11 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   } else {num_hme <- round(sum(sel_hme[code1] * sel_hme$prop_ttl_area * code1_sign))
   }
   
+  # Compute avg distance to nearest PA in miles for status grp tracts
+  dist_hm <- round(mean(sel_hm$dist_pa_mi),2)
+  dist_hme <- round(mean(sel_hme$dist_pa_mi),2)
+  
+  
     # Run loop thru each state if necessary, combining vals for 2 states into 1
     # for (i in 1:length(f)){ # Loop thru each state
     # }
@@ -192,13 +209,17 @@ prop_tracts_gt_hm_natl <- c(prop_tracts_gt_hm_natl, prop_hm)
 prop_tracts_gt_hme_natl <- c(prop_tracts_gt_hme_natl, prop_hme)
 num_gt_hm_natl <- c(num_gt_hm_natl, num_hm)
 num_gt_hme_natl <- c(num_gt_hme_natl, num_hme)
+pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
+pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
+
 
 print(paste0(grp, " tracts complete."))
 }
 
 foo <- cbind(loc, buffer, stat_grp, unit_type,
              prop_tracts_gt_hm_natl, prop_tracts_gt_hme_natl,
-             num_gt_hm_natl, num_gt_hme_natl) %>% as.data.frame()
+             num_gt_hm_natl, num_gt_hme_natl,
+             pa_dist_mi_gt_hm, pa_dist_mi_gt_hme) %>% as.data.frame()
 
 loc
 buffer
@@ -213,7 +234,7 @@ write.csv(foo, paste0(out.dir,loc,"_",buffer,"_hm_stats_",today,".csv"))
 # ## Testing grounds
 # stat_grps
 # # test w black
-# boo <- s_b2_df %>% dplyr::select(AHY2E003, black, hm, hm_energy, prop_ttl_area)
+# boo <- zone_df %>% dplyr::select(AHY2E003, black, hm, hm_energy, prop_ttl_area)
 # boo <- boo %>% filter(black == 1)
 # boo <- boo %>% filter(hm > hm_base)
 # boo$n <- boo$AHY2E003
@@ -221,13 +242,13 @@ write.csv(foo, paste0(out.dir,loc,"_",buffer,"_hm_stats_",today,".csv"))
 # sum(boo$n)
 # 
 # # test w non-white
-# boo <- s_b2_df %>% dplyr::select(AHY2E001, AHZAE003, non_white, hm, hm_energy, prop_ttl_area)
+# boo <- zone_df %>% dplyr::select(AHY2E001, AHZAE003, non_white, hm, hm_energy, prop_ttl_area)
 # boo <- boo %>% filter(non_white == 1, hm > hm_base)
 # boo$n <- boo$AHY2E001 - boo$AHZAE003
 # boo$n <- round(boo$n * boo$prop_ttl_area)
 # sum(boo$n)
 # # test w nonwhite ch pov
-# boo <- s_b2_df %>% dplyr::select(AIF6CHPOV, AIF7CHPOV, AIF8CHPOV, AIOTHCHPOV, AIGDCHPOV, nwht_chpov, hm, hm_energy, prop_ttl_area)
+# boo <- zone_df %>% dplyr::select(AIF6CHPOV, AIF7CHPOV, AIF8CHPOV, AIOTHCHPOV, AIGDCHPOV, nwht_chpov, hm, hm_energy, prop_ttl_area)
 # boo <- boo %>% filter(nwht_chpov == 1)
 # boo <- boo %>% filter(hm > hm_base)
 # attach(boo)
@@ -236,7 +257,7 @@ write.csv(foo, paste0(out.dir,loc,"_",buffer,"_hm_stats_",today,".csv"))
 # boo$n <- round(boo$n * boo$prop_ttl_area)
 # sum(boo$n) 
 # # test w low inc
-# boo <- s_b2_df %>% dplyr::select(AHY2E001, low_inc, hm, hm_energy, prop_ttl_area)
+# boo <- zone_df %>% dplyr::select(AHY2E001, low_inc, hm, hm_energy, prop_ttl_area)
 # boo <- boo %>% filter(low_inc == 1)
 # boo <- boo %>% filter(hm > hm_base)
 # boo$n <- boo$AHY2E001
