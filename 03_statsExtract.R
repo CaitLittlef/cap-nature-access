@@ -4,74 +4,67 @@
 ############################################
 
 
-## REMEMBER THE UNIVERSE YOU'RE DEALING WITH!! 
-# Race alone - total pop
-# Income - households*
-# children - families SOMETIMES subset by race.
-
-# * Vincent's code (lines 63 & 74 in utils.R) suggests
-# that income-based tracts are defined by income percentiles
-# and are then compared to individual (total pop) baselines.
-# The first part checks out, the second part prob should have
-# used a household-based baseline. But he only created an
-# individ- and a family-based baseline. It's prob close enough.
-# But when computing total numbers, it won't be possible to say
-# X # of households are low income. Rather, it will be X # of ppl
-# live in low-income tracts. (By contrast, we DO have # fams.)
-
-
-
 ##---------------------------------------------------------------------
 
 ## Create buffers around AOI and extract census tract data therein
-
 m_in_mi <- 1609
-# Select AOI and associated buffer size.
-# # --------------
-# d <- cr ; s <- txnm; loc = "Castner Range" ; print("Castner Range selected.")
-# b1 <- st_buffer(d, 10*m_in_mi) ; b1_size = "10mi"
-# b2 <- st_buffer(d, 25*m_in_mi) ; b2_size = "25mi"
-# b3 <- st_buffer(d, 50*m_in_mi) ; b3_size = "50mi"
-# # -------------- 
-d <- aka ; s <- nvca; loc = "AviKwaAme" ; print("Avi Kwa Ame selected.")
-b1 <- st_buffer(d, 25*m_in_mi) ; b1_size = "25mi"
-b2 <- st_buffer(d, 50*m_in_mi) ; b2_size = "50mi"
-b3 <- st_buffer(d, 100*m_in_mi) ; b3_size = "100mi"
-# # --------------
 
+# Select AOI and associated buffer size.
+d <- cr ; loc = "Castner Range"
+buffer <- 10
+# buffer <- 25
+# buffer <- 50
+
+## ------------------------------
+
+# d <- aka ; loc = "AviKwaAme" 
+# buffer <- 10
+# buffer <- 25
+# buffer <- 50
+
+b <- st_buffer(d, buffer*m_in_mi)
+
+## ------------------------------
+
+print(paste0(loc," selected with buffer of ", buffer, " miles."))
+
+
+# Generate random sample of polygons aross western US/Central Plains
+# Generate n random points within domain
+n <- 100
+n <- 10
+pts = sf::st_sample(domain, size = n) ; str(pts).
+# Grow buffer around those points to match size of target (d) PLUS buffer
+# For width, take sqrt of area for "one side" then halve it. Then add buffer on.
+sample <- gBuffer(as_Spatial(pts),
+                  width = sqrt(terra::area(as_Spatial(d)))/2 + buffer*m_in_mi, 
+                  byid = TRUE) %>% # keep them all separate polys
+  st_as_sf()
+
+b <- sample
+loc <- "CR random sample"
+
+
+
+## ----------------------------------------
 
 ## Find census tracts that intersect w each buffer.
 
-
-s_b1 <- st_intersection(b1, s)
-s_b2 <- st_intersection(b2, s)
-s_b3 <- st_intersection(b3, s)
+zone <- st_intersection(b, tracts) # or do all tracts; not much longer
 
 # Compute new areas to account for partial census tracts.
-s_b1$area_km2_new <- terra::area(as_Spatial(s_b1)) / 1000000
-s_b2$area_km2_new <- terra::area(as_Spatial(s_b2)) / 1000000
-s_b3$area_km2_new <- terra::area(as_Spatial(s_b3)) / 1000000
+zone$area_km2_new <- terra::area(as_Spatial(zone)) / 1000000
 
-# Compute the proportion of the original tract area the new portion represents.
-# This will be used to scale population numbers within each.
-# Visual check to make sure many match. 
-# round(s_b1$area_km2[1:30],2) ; round(s_b1$area_km2_new[1:30],2)
-# round(s_b2$area_km2[125:150],2) ; round(s_b2$area_km2_new[125:150],2)
-# round(s_b3$area_km2[125:150],2) ; round(s_b3$area_km2_new[125:150],2)
-s_b1$prop_ttl_area <- s_b1$area_km2_new/s_b1$area_km2 ; Mode(round(s_b1$prop_ttl_area, 4))
-s_b2$prop_ttl_area <- s_b2$area_km2_new/s_b2$area_km2 ; Mode(round(s_b2$prop_ttl_area, 4))
-s_b3$prop_ttl_area <- s_b3$area_km2_new/s_b3$area_km2 ; Mode(round(s_b3$prop_ttl_area, 4))
+# Compute prop of orig tract area for scaling pop #s within all tracts (most should = 1)
+zone$prop_ttl_area <- zone$area_km2_new/zone$area_km2 ; Mode(round(zone$prop_ttl_area, 4))
+
+# Eliminate any rows that have zero ppl else get NA rows when subsetting. 
+zone <- zone[zone$AHY2E001 > 0,]
+
 
 
 ## --------------------------------------------------------------------
 
-# Which zone? Turn on/off.
-zone <- s_b1 ; (buffer <- b1_size)
-# zone <- s_b2 ; (buffer <- b2_size)
-# zone <- s_b3 ; (buffer <- b3_size)
-
-# Eliminate any rows that have zero ppl else get NA rows when subsetting. 
-zone <- zone[zone$AHY2E001 > 0,]
 
 # Pull state abbreviations for selecting PAs from PADUS
 (states <- unique(zone$STATE))
@@ -175,9 +168,9 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   } else {num_hme <- round(sum(sel_hme[code1] * sel_hme$prop_ttl_area * code1_sign))
   }
   
-  # Compute avg distance to nearest PA in miles for status grp tracts
-  dist_hm <- round(mean(sel_hm$dist_pa_mi),2)
-  dist_hme <- round(mean(sel_hme$dist_pa_mi),2)
+  # # Compute avg distance to nearest PA in miles for status grp tracts
+  # dist_hm <- round(mean(sel_hm$dist_pa_mi),2)
+  # dist_hme <- round(mean(sel_hme$dist_pa_mi),2)
   
   
     # Run loop thru each state if necessary, combining vals for 2 states into 1
@@ -190,8 +183,8 @@ prop_tracts_gt_hm_natl <- c(prop_tracts_gt_hm_natl, prop_hm)
 prop_tracts_gt_hme_natl <- c(prop_tracts_gt_hme_natl, prop_hme)
 num_gt_hm_natl <- c(num_gt_hm_natl, num_hm)
 num_gt_hme_natl <- c(num_gt_hme_natl, num_hme)
-pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
-pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
+# pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
+# pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
 
 
 print(paste0(grp, " tracts complete."))
@@ -204,7 +197,7 @@ foo <- cbind(loc, buffer, stat_grp, unit_type,
 
 loc
 buffer
-write.csv(foo, paste0(out.dir,loc,"_",buffer,"_hm_stats_",today,".csv"))
+write.csv(foo, paste0(out.dir,loc,"_", buffer,"mi_hm_stats_",today,".csv"))
 
 
 
