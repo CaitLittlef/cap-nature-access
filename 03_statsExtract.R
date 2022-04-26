@@ -26,7 +26,7 @@
 ## Create buffers around AOI and extract census tract data therein
 
 m_in_mi <- 1609
-# Select AOI and associated buffer sizes
+# Select AOI and associated buffer size.
 # # --------------
 # d <- cr ; s <- txnm; loc = "Castner Range" ; print("Castner Range selected.")
 # b1 <- st_buffer(d, 10*m_in_mi) ; b1_size = "10mi"
@@ -39,25 +39,9 @@ b2 <- st_buffer(d, 50*m_in_mi) ; b2_size = "50mi"
 b3 <- st_buffer(d, 100*m_in_mi) ; b3_size = "100mi"
 # # --------------
 
-# plot(b3)
-# plot(b2, add = TRUE)
-# plot(b1, add = TRUE)
-# plot(d, add = TRUE)
-
 
 ## Find census tracts that intersect w each buffer.
-# 1st, ensure existing sqkm is correct to use to weight #ppl for partial tracts.
-# area_sqkm <- terra::area(as_Spatial(s)) / 1000000
-# mean(abs(area_sqkm - s$area_km2)) ; max(abs(area_sqkm - s$area_km2)) 
-# identical(round(txnm$area_km2,4), round(area_sqkm,4)) # TRUE for CR, not quite AKA but close enough
-# area_sqkm <- NULL
 
-# Initial intersection threw this error
-  # Error in s2_geography_from_wkb(x, oriented = oriented, check = check) : 
-  #   Evaluation error: Found 1 feature with invalid spherical geometry.
-  # [1] Loop 228 is not valid: Edge 8281 has duplicate vertex with edge 8285
-# Advised on github: sf_use_s2(FALSE)
-sf_use_s2(FALSE)
 
 s_b1 <- st_intersection(b1, s)
 s_b2 <- st_intersection(b2, s)
@@ -89,7 +73,7 @@ zone <- s_b1 ; (buffer <- b1_size)
 # Eliminate any rows that have zero ppl else get NA rows when subsetting. 
 zone <- zone[zone$AHY2E001 > 0,]
 
-# Pull state abbreviations for selecting PAs 
+# Pull state abbreviations for selecting PAs from PADUS
 (states <- unique(zone$STATE))
 (states_abb <- if("Texas" %in% states) c("NM", "TX") else c("CA", "NV"))
 
@@ -133,9 +117,6 @@ pa_dist_mi_gt_hme <- as.numeric()
 ## LOOP ## -------------------------------------------------------
 # Loop through status grps but exclude baselines (tracts_ind, tracts_fam)
 for (i in (1:length(stat_grps))[-c(25,26)]){ 
-# for (i in 2){ # test black
-# for (i in 4){ # test non-white
-# for (i in 19){ # test non-white w children in pov
   # Assign status grp name
   grp <- stat_grps[i]
   
