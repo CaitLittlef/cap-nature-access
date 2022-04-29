@@ -3,9 +3,8 @@
 ###########
 
 
-today <- paste0(mid(Sys.Date(),3,2),
-                mid(Sys.Date(),6,2),
-                mid(Sys.Date(),9,2))
+# start <- Sys.time()
+# print(Sys.time() - start)
 
 
 #####################################
