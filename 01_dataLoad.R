@@ -1,4 +1,28 @@
 
+## REMEMBER THE UNIVERSE YOU'RE DEALING WITH!! 
+# Race alone - total pop
+# Income - households*
+# children - families SOMETIMES subset by race.
+
+# * Vincent's code (lines 63 & 74 in utils.R) suggests
+# that income-based tracts are defined by income percentiles
+# and are then compared to individual (total pop) baselines.
+# The first part checks out, the second part prob should have
+# used a household-based baseline. But he only created an
+# individ- and a family-based baseline. It's prob close enough.
+# But when computing total numbers, it won't be possible to say
+# X # of households are low income. Rather, it will be X # of ppl
+# live in low-income tracts. (By contrast, we DO have # fams.)
+
+
+today <- paste0(mid(Sys.Date(),3,2),
+                mid(Sys.Date(),6,2),
+                mid(Sys.Date(),9,2))
+
+m_in_mi <- 1609
+sqm_in_sqkm <- 1000000
+
+
 ######################################
 ## DATA COLLECTION & PRE-PROCESSING ##
 ######################################
@@ -20,27 +44,41 @@ proj.crs <- "+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=
 
 
 
+## !!!!!!!!!! --------------------------------------------
+# If subsetting to Central Plains & Western US from CONUS, change in 3 places:
+# line 70
+# line 81
+# line 135
+## !!!!!!!!!! --------------------------------------------
+
+##-------------------------------------------------------------
+
+# Load CONUS and consider keeping only states in western US/Central Plains
+
+domain <- load_f("C:/Users/clitt/OneDrive/Desktop/data_gen/political/tl_2012_us_state.shp")
+nix <- c("Alaska",
+         "American Samoa",
+         "Commonwealth of the Northern Mariana Islands",
+         "Guam",
+         "Puerto Rico",
+         "Hawaii",
+         "United States Virgin Islands")
+domain <- domain %>% filter(!NAME %in% nix)
+# keeps <- c("Washington", "Oregon", "California", "Idaho", "Montana",
+           # "Wyoming", "Nevada", "Utah", "Colorado", "Arizona",
+           # "New Mexico", "North Dakota", "South Dakota", "Nebraska",
+           # "Kansas", "Oklahoma", "Texas")
+# domain <- domain %>% filter(NAME %in% keeps)
+unique(domain$NAME)
+
 ##-------------------------------------------------------------
 
 # Load tracts (function takes way too long on giant shapefile). 
 tracts <- read_sf(paste0(data.dir,"2020 data - output/output_tract_hm_attr_2013_2017.shp"))
 
-# Subset to relevant states; now that they're smaller, transform.
-txnm <- tracts %>%
-  dplyr::filter(STATE == "Texas" | STATE == "New Mexico") %>%
-  st_transform(proj.crs)
-
-nvca <- tracts %>%
-  dplyr::filter(STATE == "Nevada" | STATE == "California") %>%
-  st_transform(proj.crs)
-
-# Subset to western and Central Plains states, too.
-keeps <- c("Washington", "Oregon", "California", "Idaho", "Montana",
-           "Wyoming", "Nevada", "Utah", "Colorado", "Arizona",
-           "New Mexico", "North Dakota", "South Dakota", "Nebraska",
-           "Kansas", "Oklahoma", "Texas")
+# Potentially subset to western and Central Plains states.
 tracts <- tracts %>%
-  filter(STATE %in% keeps) %>%
+  # filter(STATE %in% keeps) %>%
   st_transform(proj.crs)
 
 
@@ -89,10 +127,11 @@ hm_natl <- read.csv(paste0(data.dir,"2020 data - output/output_hm_by_status_natl
 if(!exists("padus")) padus <- st_read("C:/Users/clitt/OneDrive/Desktop/data_gen/PADUS_2_1/PAD_US2_1.gdb",
                                       layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
 
+# keeps <- c("WA", "OR", "CA", "ID", "MT", "WY", "NV", "UT", "CO", "AZ", "NM", "ND", "SD", "NE", "KS", "OK", "TX")
 # Filter by category, state, and GAP status
 cats <- c("Proclamation", "Designation", "Easement", "Fee")
-pa <- padus %>% filter(State_Nm %in% states_abb,
-                       Category %in% cats,
+pa <- padus %>% filter(Category %in% cats,
+                       # State_Nm %in% keeps,
                        GAP_Sts == "1" | GAP_Sts == "2")
 
 
@@ -109,3 +148,11 @@ ensure_multipolygons <- function(X) {
   st_sf(st_drop_geometry(X), geom = st_geometry(Y))
 }
 pa <- ensure_multipolygons(pa)
+
+# # Confirm unit of pa$SHAPE_area and that it's accurate.
+# area_sqm <- terra::area(as_Spatial(pa))
+# mean(abs(area_sqm - pa$SHAPE_Area)) ; max(abs(area_sqm - pa$SHAPE_Area))
+# # max is 1.3 sq km. Close enough.
+
+remove(padus)
+gc()
