@@ -6,43 +6,37 @@
 
 ##---------------------------------------------------------------------
 
-## Create buffers around AOI and extract census tract data therein
-m_in_mi <- 1609
-
-# Select AOI and associated buffer size.
-d <- cr ; loc = "Castner Range"
-buffer <- 10
-# buffer <- 25
-# buffer <- 50
-
-## ------------------------------
-
-# d <- aka ; loc = "AviKwaAme" 
-# buffer <- 10
-# buffer <- 25
-# buffer <- 50
-
-b <- st_buffer(d, buffer*m_in_mi)
-
-## ------------------------------
-
-print(paste0(loc," selected with buffer of ", buffer, " miles."))
-
-
-# Generate random sample of polygons aross western US/Central Plains
-# Generate n random points within domain
+## Chose AOI, select buffer_mi, and whether it's real or random sample.
+# Random sample are of polys that are same size as selected aoi plus buffer_mi.
+# For poly width, take sqrt of aoi area to get "one side", halve it, add buffer_mi.
 n <- 100
-n <- 10
-pts = sf::st_sample(domain, size = n) ; str(pts).
-# Grow buffer around those points to match size of target (d) PLUS buffer
-# For width, take sqrt of area for "one side" then halve it. Then add buffer on.
-sample <- gBuffer(as_Spatial(pts),
-                  width = sqrt(terra::area(as_Spatial(d)))/2 + buffer*m_in_mi, 
-                  byid = TRUE) %>% # keep them all separate polys
+# n <- 50
+
+# loc = "CR" ; d <- cr
+# loc = "CR_randSample" ; d <- cr
+# loc = "AKA" ; d <- aka
+loc = "AKA_randSample" ; d <- aka
+
+# buffer_mi <- 10
+# buffer_mi <- 25
+buffer_mi <- 50
+
+
+if(loc == "CR") b <- st_buffer(d, buffer_mi*m_in_mi)
+if(loc == "CR_randSample") b <- sf::st_sample(domain, size = n) %>% as_Spatial() %>%
+  gBuffer(width = sqrt(terra::area(as_Spatial(d)))/2 + buffer_mi*m_in_mi, byid = TRUE) %>%
+  st_as_sf()
+if(loc == "AKA") b <- st_buffer(d, buffer_mi*m_in_mi)
+if(loc == "AKA_randSample") b <- sf::st_sample(domain, size = n) %>% as_Spatial() %>%
+  gBuffer(width = sqrt(terra::area(as_Spatial(d)))/2 + buffer_mi*m_in_mi, byid = TRUE) %>%
   st_as_sf()
 
-b <- sample
-loc <- "CR random sample"
+####
+
+print(paste0(loc," selected with buffer of ", buffer_mi, " miles."))
+
+plot(st_geometry(domain))
+plot(b, add = TRUE)
 
 
 
@@ -50,7 +44,9 @@ loc <- "CR random sample"
 
 ## Find census tracts that intersect w each buffer.
 
-zone <- st_intersection(b, tracts) # or do all tracts; not much longer
+start <- Sys.time()
+zone <- st_intersection(b, tracts) 
+print(Sys.time() - start)
 
 # Compute new areas to account for partial census tracts.
 zone$area_km2_new <- terra::area(as_Spatial(zone)) / 1000000
@@ -58,20 +54,23 @@ zone$area_km2_new <- terra::area(as_Spatial(zone)) / 1000000
 # Compute prop of orig tract area for scaling pop #s within all tracts (most should = 1)
 zone$prop_ttl_area <- zone$area_km2_new/zone$area_km2 ; Mode(round(zone$prop_ttl_area, 4))
 
-# Eliminate any rows that have zero ppl else get NA rows when subsetting. 
+# Eliminate any rows w NAs and rows w zero ppl else return NAs in loop.
 zone <- zone[zone$AHY2E001 > 0,]
-
+# which(is.na(zone), arr.ind = TRUE)
+zone <- na.omit(zone)
 
 
 ## --------------------------------------------------------------------
 
+# Calc dist to nearest PAs.
 
-# Pull state abbreviations for selecting PAs from PADUS
-(states <- unique(zone$STATE))
-(states_abb <- if("Texas" %in% states) c("NM", "TX") else c("CA", "NV"))
+# What size cut-off? PAs must be at least...
+size <- 50 #sqkm
 
 # Source code that calcs dist to nearest PA for each tract and adds to shapefile.
+start <- Sys.time()
 source(paste0(wd, "analyses/cap-nature-access/04_distPA.R"), echo = FALSE)
+print(Sys.time() - start)
 
 # set geom to null for faster looping
 zone_df <- zone ; zone_df$geometry <- NULL
@@ -138,8 +137,8 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   sel_hme <- all[all$hm_energy > hme_base,]
   
   # Compute prop of grp tracts w hm/hme > avg
-  prop_hm <- round(nrow(sel_hm)/nrow(all),4)
-  prop_hme <- round(nrow(sel_hme)/nrow(all),4)
+  prop_hm <- round(nrow(sel_hm)/nrow(all),2)
+  prop_hme <- round(nrow(sel_hme)/nrow(all),2)
   
   # Compute ttl # ppl or fams w hm/hme > avg, correcting for partial tract areas.
   # Several grps use multiple codes (additive is +1 in sign, subtract is -1)
@@ -169,8 +168,8 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   }
   
   # # Compute avg distance to nearest PA in miles for status grp tracts
-  # dist_hm <- round(mean(sel_hm$dist_pa_mi),2)
-  # dist_hme <- round(mean(sel_hme$dist_pa_mi),2)
+  dist_hm <- round(mean(sel_hm$dist_pa_mi),2)
+  dist_hme <- round(mean(sel_hme$dist_pa_mi),2)
   
   
     # Run loop thru each state if necessary, combining vals for 2 states into 1
@@ -183,29 +182,36 @@ prop_tracts_gt_hm_natl <- c(prop_tracts_gt_hm_natl, prop_hm)
 prop_tracts_gt_hme_natl <- c(prop_tracts_gt_hme_natl, prop_hme)
 num_gt_hm_natl <- c(num_gt_hm_natl, num_hm)
 num_gt_hme_natl <- c(num_gt_hme_natl, num_hme)
-# pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
-# pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
+pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
+pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
 
 
 print(paste0(grp, " tracts complete."))
 }
 
-foo <- cbind(loc, buffer, stat_grp, unit_type,
+foo <- cbind(loc, buffer_mi, stat_grp, unit_type,
              prop_tracts_gt_hm_natl, prop_tracts_gt_hme_natl,
              num_gt_hm_natl, num_gt_hme_natl,
              pa_dist_mi_gt_hm, pa_dist_mi_gt_hme) %>% as.data.frame()
 
 loc
-buffer
-write.csv(foo, paste0(out.dir,loc,"_", buffer,"mi_hm_stats_",today,".csv"))
+buffer_mi
+write.csv(foo, paste0(out.dir,loc,"_", buffer_mi,"mi_hm_stats_",today,".csv"))
 
+gc()
 
-
-
+loc
 
 
 ## ------------------------------------------------------------------------------------------------
+## ------------------------------------------------------------------------------------------------
+## ------------------------------------------------------------------------------------------------
+## ------------------------------------------------------------------------------------------------
+
+
 # ## Testing grounds
+# loc
+# buffer_mi
 # stat_grps
 # # test w black
 # boo <- zone_df %>% dplyr::select(AHY2E003, black, hm, hm_energy, prop_ttl_area)
@@ -241,3 +247,26 @@ write.csv(foo, paste0(out.dir,loc,"_", buffer,"mi_hm_stats_",today,".csv"))
 
 
 
+# ## Compare to state-level and national hm values
+# (hm_natl_med <- hm_natl$hm_mean[hm_natl$status_group == "tracts_ind"])
+# (hm_tx_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Texas"])
+# (hm_nm_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "New Mexico"])
+# (hm_az_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Arizona"])
+# (hm_ca_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "California"])
+# (hm_nv_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Nevada"])
+# 
+# 
+# ## What prop status grp tracts within X miles of aoi have > natl or state median hm?
+# (ttl_tracts <- sum(zone_df$hisp_chpov, na.rm = TRUE))
+# (num_tracts_gt_natl_hm_med <- sum(zone_df$hisp_chpov[zone_df$hm > hm_natl_med], na.rm = TRUE))
+# 
+# num_tracts_gt_hm_st1 <- sum(zone_df$hisp_chpov[zone_df$STATE == "Texas" &
+#                                                           zone_df$hm > hm_az_med], na.rm = TRUE)
+# num_tracts_gt_hm_st2 <- sum(zone_df$hisp_chpov[zone_df$STATE == "New Mexico" &
+#                                                           zone_df$hm > hm_nv_med], na.rm = TRUE)
+# # num_tracts_gt_hm_st3 <- sum(zone_df$non_white[zone_df$STATE == "California" &
+# #                                                         zone_df$hm > hm_ca_med], na.rm = TRUE)
+# (num_tracts_gt_state_hm <- num_tracts_gt_hm_st1 + num_tracts_gt_hm_st2)
+# # (num_tracts_gt_state_hm <- num_tracts_gt_hm_st1 + num_tracts_gt_hm_st2 + num_tracts_gt_hm_st3)
+# 95/112
+# 96/112
