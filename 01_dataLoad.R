@@ -48,7 +48,7 @@ proj.crs <- "+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=
 # If subsetting to Central Plains & Western US from CONUS, change in 3 places:
 # line 70
 # line 81
-# line 135
+# line 131
 ## !!!!!!!!!! --------------------------------------------
 
 ##-------------------------------------------------------------
@@ -69,7 +69,7 @@ domain <- domain %>% filter(!NAME %in% nix)
            # "New Mexico", "North Dakota", "South Dakota", "Nebraska",
            # "Kansas", "Oklahoma", "Texas")
 # domain <- domain %>% filter(NAME %in% keeps)
-unique(domain$NAME)
+unique(domain$NAME) #49 bc includes DC
 
 ##-------------------------------------------------------------
 
@@ -97,9 +97,9 @@ sf_use_s2(FALSE)
 
 
 # Load in look-up for census codes to get raw #s of individs & fams
-# install.packages("readxl")
-library(readxl)
-lu <- read_excel(paste0(data.dir,"lu_census_codes.xlsx"),sheet = "lu")
+# install.packages("openxlsx")
+library(openxlsx)
+lu <- read.xlsx(paste0(data.dir,"lu_census_codes.xlsx"),sheet = "lu")
 
 
 
@@ -126,12 +126,17 @@ hm_natl <- read.csv(paste0(data.dir,"2020 data - output/output_hm_by_status_natl
 # Load PADUS only if it's not already loaded.
 if(!exists("padus")) padus <- st_read("C:/Users/clitt/OneDrive/Desktop/data_gen/PADUS_2_1/PAD_US2_1.gdb",
                                       layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
+# unique(padus$State_Nm)
 
+# Just Western US/Central Plains
 # keeps <- c("WA", "OR", "CA", "ID", "MT", "WY", "NV", "UT", "CO", "AZ", "NM", "ND", "SD", "NE", "KS", "OK", "TX")
+# Just CONUS (see whats abbs correspond to in meta data)
+nix <- c("AK", "HI","AS","GU","MH","PW","PR","UM","VI","UNKF","FM","MP")
 # Filter by category, state, and GAP status
 cats <- c("Proclamation", "Designation", "Easement", "Fee")
 pa <- padus %>% filter(Category %in% cats,
                        # State_Nm %in% keeps,
+                       !State_Nm %in% nix,
                        GAP_Sts == "1" | GAP_Sts == "2")
 
 
