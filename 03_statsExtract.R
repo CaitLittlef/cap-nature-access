@@ -87,6 +87,7 @@ stat_grp <- as.character()
 unit_type <- as.character()
 
 # Human mod (all & energy) - natl
+num_stat_grp_tracts <- as.numeric()
 prop_tracts_gt_hm_natl <- as.numeric()
 num_gt_hm_natl <- as.numeric()
 prop_tracts_gt_hme_natl <- as.numeric()
@@ -178,6 +179,7 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   
 stat_grp <- c(stat_grp, grp)
 unit_type <- c(unit_type, unit)
+num_stat_grp_tracts <- c(num_stat_grp_tracts, nrow(all))
 prop_tracts_gt_hm_natl <- c(prop_tracts_gt_hm_natl, prop_hm)
 prop_tracts_gt_hme_natl <- c(prop_tracts_gt_hme_natl, prop_hme)
 num_gt_hm_natl <- c(num_gt_hm_natl, num_hm)
@@ -189,7 +191,7 @@ pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
 print(paste0(grp, " tracts complete."))
 }
 
-foo <- cbind(loc, buffer_mi, stat_grp, unit_type,
+foo <- cbind(loc, buffer_mi, stat_grp, unit_type, num_stat_grp_tracts,
              prop_tracts_gt_hm_natl, prop_tracts_gt_hme_natl,
              num_gt_hm_natl, num_gt_hme_natl,
              pa_dist_mi_gt_hm, pa_dist_mi_gt_hme) %>% as.data.frame()
