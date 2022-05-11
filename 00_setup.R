@@ -85,13 +85,6 @@ library(chemCal)
 options(scipen=999) 
 
 
-#####################################
-# Grab date for saving files
-# currentDate <- Sys.Date()
-
-today <- paste0(mid(Sys.Date(),3,2),
-                mid(Sys.Date(),6,2),
-                mid(Sys.Date(),9,2))
 
 
 #####################################
