@@ -121,43 +121,45 @@ hm_natl <- read.csv(paste0(data.dir,"2020 data - output/output_hm_by_status_natl
 
 
 
-##-------------------------------------------------------------
-
-# Load PADUS only if it's not already loaded.
-if(!exists("padus")) padus <- st_read("C:/Users/clitt/OneDrive/Desktop/data_gen/PADUS_2_1/PAD_US2_1.gdb",
-                                      layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
-# unique(padus$State_Nm)
-
-# Just Western US/Central Plains
-# keeps <- c("WA", "OR", "CA", "ID", "MT", "WY", "NV", "UT", "CO", "AZ", "NM", "ND", "SD", "NE", "KS", "OK", "TX")
-# Just CONUS (see whats abbs correspond to in meta data)
-nix <- c("AK", "HI","AS","GU","MH","PW","PR","UM","VI","UNKF","FM","MP")
-# Filter by category, state, and GAP status
-cats <- c("Proclamation", "Designation", "Easement", "Fee")
-pa <- padus %>% filter(Category %in% cats,
-                       # State_Nm %in% keeps,
-                       !State_Nm %in% nix,
-                       GAP_Sts == "1" | GAP_Sts == "2")
-
-
-# To pre-empt error related to multisurface geometries, here's fix...
-# ref: https://gis.stackexchange.com/questions/389814/r-st-centroid-geos-error-unknown-wkb-type-12
-# install.packages("gdalUtilities")
-library(gdalUtilities)
-ensure_multipolygons <- function(X) {
-  tmp1 <- tempfile(fileext = ".gpkg")
-  tmp2 <- tempfile(fileext = ".gpkg")
-  st_write(X, tmp1)
-  ogr2ogr(tmp1, tmp2, f = "GPKG", nlt = "MULTIPOLYGON")
-  Y <- st_read(tmp2)
-  st_sf(st_drop_geometry(X), geom = st_geometry(Y))
-}
-pa <- ensure_multipolygons(pa)
-
-# # Confirm unit of pa$SHAPE_area and that it's accurate.
-# area_sqm <- terra::area(as_Spatial(pa))
-# mean(abs(area_sqm - pa$SHAPE_Area)) ; max(abs(area_sqm - pa$SHAPE_Area))
-# # max is 1.3 sq km. Close enough.
-
-remove(padus)
-gc()
+# ##-------------------------------------------------------------
+# 
+# # Load PADUS only if it's not already loaded.
+# if(!exists("padus")) padus <- st_read("C:/Users/clitt/OneDrive/Desktop/data_gen/PADUS_2_1/PAD_US2_1.gdb",
+#                                       layer="PADUS2_1Combined_Proclamation_Marine_Fee_Designation_Easement")
+# # unique(padus$State_Nm)
+# 
+# # Just Western US/Central Plains
+# # keeps <- c("WA", "OR", "CA", "ID", "MT", "WY", "NV", "UT", "CO", "AZ", "NM", "ND", "SD", "NE", "KS", "OK", "TX")
+# # Just CONUS (see whats abbs correspond to in meta data)
+# nix <- c("AK", "HI","AS","GU","MH","PW","PR","UM","VI","UNKF","FM","MP")
+# # Filter by category, state, and GAP status
+# cats <- c("Proclamation", "Designation", "Easement", "Fee")
+# pa <- padus %>% filter(Category %in% cats,
+#                        # State_Nm %in% keeps,
+#                        !State_Nm %in% nix,
+#                        GAP_Sts == "1" | GAP_Sts == "2")
+# 
+# 
+# # To pre-empt error related to multisurface geometries, here's fix...
+# # ref: https://gis.stackexchange.com/questions/389814/r-st-centroid-geos-error-unknown-wkb-type-12
+# # install.packages("gdalUtilities")
+# library(gdalUtilities)
+# ensure_multipolygons <- function(X) {
+#   tmp1 <- tempfile(fileext = ".gpkg")
+#   tmp2 <- tempfile(fileext = ".gpkg")
+#   st_write(X, tmp1)
+#   ogr2ogr(tmp1, tmp2, f = "GPKG", nlt = "MULTIPOLYGON")
+#   Y <- st_read(tmp2)
+#   st_sf(st_drop_geometry(X), geom = st_geometry(Y))
+# }
+# pa <- ensure_multipolygons(pa)
+# 
+# # # Confirm unit of pa$SHAPE_area and that it's accurate.
+# # area_sqm <- terra::area(as_Spatial(pa))
+# # mean(abs(area_sqm - pa$SHAPE_Area)) ; max(abs(area_sqm - pa$SHAPE_Area))
+# # # max is 1.3 sq km. Close enough.
+# 
+# remove(padus, cats)
+# remove(nix)
+# remove(keeps)
+# gc()
