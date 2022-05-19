@@ -9,17 +9,17 @@
 ## Chose AOI, select buffer_mi, and whether it's real or random sample.
 # Random sample are of polys that are same size as selected aoi plus buffer_mi.
 # For poly width, take sqrt of aoi area to get "one side", halve it, add buffer_mi.
-n <- 100
+n <- 500
 # n <- 50
 
-# loc = "CR" ; d <- cr
+# loc = "CR" ; d <- cr ; n <- 1 # set n = 1 for division in loop
 # loc = "CR_randSample" ; d <- cr
-# loc = "AKA" ; d <- aka
+# loc = "AKA" ; d <- aka; n <- 1
 loc = "AKA_randSample" ; d <- aka
 
 # buffer_mi <- 10
-# buffer_mi <- 25
-buffer_mi <- 50
+buffer_mi <- 25
+# buffer_mi <- 50
 
 
 if(loc == "CR") b <- st_buffer(d, buffer_mi*m_in_mi)
@@ -44,9 +44,21 @@ plot(b, add = TRUE)
 
 ## Find census tracts that intersect w each buffer.
 
+# May need to make space for next calcs; can remove pas if not doing dist (below)
+remove(all) ; remove(sel_hm) ; remove(sel_hme) ; remove(pa)
+gc()
+
+
 start <- Sys.time()
 zone <- st_intersection(b, tracts) 
 print(Sys.time() - start)
+
+# remove(tracts)
+
+# Eliminate any rows w NAs and rows w zero ppl else return NAs in loop.
+zone <- zone[zone$AHY2E001 > 0,]
+# which(is.na(zone), arr.ind = TRUE)
+zone <- na.omit(zone)
 
 # Compute new areas to account for partial census tracts.
 zone$area_km2_new <- terra::area(as_Spatial(zone)) / 1000000
@@ -54,27 +66,36 @@ zone$area_km2_new <- terra::area(as_Spatial(zone)) / 1000000
 # Compute prop of orig tract area for scaling pop #s within all tracts (most should = 1)
 zone$prop_ttl_area <- zone$area_km2_new/zone$area_km2 ; Mode(round(zone$prop_ttl_area, 4))
 
-# Eliminate any rows w NAs and rows w zero ppl else return NAs in loop.
-zone <- zone[zone$AHY2E001 > 0,]
-# which(is.na(zone), arr.ind = TRUE)
-zone <- na.omit(zone)
 
 
 ## --------------------------------------------------------------------
 
 # Calc dist to nearest PAs.
 
-# What size cut-off? PAs must be at least...
-size <- 50 #sqkm
+# IF NOT RUNNING DIST (EG WITH LARGER SAMPLE), SET DUMMY VALUE...
+# ...SO THAT LOOP WORKS AND THEN APPEND SMALLER SAMPLE VALUES (EG N=100)
+zone$dist_pa_mi <- 0 ; dist <- "dist0ff" ; remove(pa)
 
-# Source code that calcs dist to nearest PA for each tract and adds to shapefile.
-start <- Sys.time()
-source(paste0(wd, "analyses/cap-nature-access/04_distPA.R"), echo = FALSE)
-print(Sys.time() - start)
+
+
+# dist <- "distOn
+# # What size cut-off? PAs must be at least...
+# size <- 50 #sqkm
+# 
+# # Source code that calcs dist to nearest PA for each tract and adds to shapefile.
+# start <- Sys.time()
+# source(paste0(wd, "analyses/cap-nature-access/04_distPA.R"), echo = FALSE)
+# print(Sys.time() - start)
+
+
+
 
 # set geom to null for faster looping
 zone_df <- zone ; zone_df$geometry <- NULL
 
+# object.size(zone)
+remove(zone) ; gc()
+# object.size(zone_df)
 
 
 ## --------------------------------------------------------------------------
@@ -86,8 +107,11 @@ zone_df <- zone ; zone_df$geometry <- NULL
 stat_grp <- as.character()
 unit_type <- as.character()
 
-# Human mod (all & energy) - natl
+# Status grp tract tallies
+num_tracts <- as.numeric()
 num_stat_grp_tracts <- as.numeric()
+
+# Human mod (all & energy) - natl
 prop_tracts_gt_hm_natl <- as.numeric()
 num_gt_hm_natl <- as.numeric()
 prop_tracts_gt_hme_natl <- as.numeric()
@@ -179,11 +203,12 @@ for (i in (1:length(stat_grps))[-c(25,26)]){
   
 stat_grp <- c(stat_grp, grp)
 unit_type <- c(unit_type, unit)
-num_stat_grp_tracts <- c(num_stat_grp_tracts, nrow(all))
+num_tracts <- c(num_tracts, round(nrow(zone_df)/n,0))
+num_stat_grp_tracts <- c(num_stat_grp_tracts, round(nrow(all)/n,0)) # to get avg per sample
 prop_tracts_gt_hm_natl <- c(prop_tracts_gt_hm_natl, prop_hm)
 prop_tracts_gt_hme_natl <- c(prop_tracts_gt_hme_natl, prop_hme)
-num_gt_hm_natl <- c(num_gt_hm_natl, num_hm)
-num_gt_hme_natl <- c(num_gt_hme_natl, num_hme)
+num_gt_hm_natl <- c(num_gt_hm_natl, round(num_hm/n,0))
+num_gt_hme_natl <- c(num_gt_hme_natl, round(num_hme/n,0))
 pa_dist_mi_gt_hm <- c(pa_dist_mi_gt_hm, dist_hm)
 pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
 
@@ -191,84 +216,18 @@ pa_dist_mi_gt_hme <- c(pa_dist_mi_gt_hme, dist_hme)
 print(paste0(grp, " tracts complete."))
 }
 
-foo <- cbind(loc, buffer_mi, stat_grp, unit_type, num_stat_grp_tracts,
+foo <- cbind(loc, buffer_mi, num_tracts, stat_grp, unit_type, num_stat_grp_tracts,
              prop_tracts_gt_hm_natl, prop_tracts_gt_hme_natl,
              num_gt_hm_natl, num_gt_hme_natl,
              pa_dist_mi_gt_hm, pa_dist_mi_gt_hme) %>% as.data.frame()
 
 loc
 buffer_mi
-write.csv(foo, paste0(out.dir,loc,"_", buffer_mi,"mi_hm_stats_",today,".csv"))
+write.csv(foo, paste0(out.dir,loc,"_",buffer_mi,"mi_n",n,"_",dist,"_hm_stats_",today,".csv"))
 
 gc()
 
 loc
 
 
-## ------------------------------------------------------------------------------------------------
-## ------------------------------------------------------------------------------------------------
-## ------------------------------------------------------------------------------------------------
-## ------------------------------------------------------------------------------------------------
 
-
-# ## Testing grounds
-# loc
-# buffer_mi
-# stat_grps
-# # test w black
-# boo <- zone_df %>% dplyr::select(AHY2E003, black, hm, hm_energy, prop_ttl_area)
-# boo <- boo %>% filter(black == 1)
-# boo <- boo %>% filter(hm > hm_base)
-# boo$n <- boo$AHY2E003
-# boo$n <- round(boo$n * boo$prop_ttl_area)
-# sum(boo$n)
-# 
-# # test w non-white
-# boo <- zone_df %>% dplyr::select(AHY2E001, AHZAE003, non_white, hm, hm_energy, prop_ttl_area)
-# boo <- boo %>% filter(non_white == 1, hm > hm_base)
-# boo$n <- boo$AHY2E001 - boo$AHZAE003
-# boo$n <- round(boo$n * boo$prop_ttl_area)
-# sum(boo$n)
-# # test w nonwhite ch pov
-# boo <- zone_df %>% dplyr::select(AIF6CHPOV, AIF7CHPOV, AIF8CHPOV, AIOTHCHPOV, AIGDCHPOV, nwht_chpov, hm, hm_energy, prop_ttl_area)
-# boo <- boo %>% filter(nwht_chpov == 1)
-# boo <- boo %>% filter(hm > hm_base)
-# attach(boo)
-# boo$n <- round(AIF6CHPOV + AIF7CHPOV + AIF8CHPOV + AIOTHCHPOV + AIGDCHPOV)
-# detach(boo)
-# boo$n <- round(boo$n * boo$prop_ttl_area)
-# sum(boo$n) 
-# # test w low inc
-# boo <- zone_df %>% dplyr::select(AHY2E001, low_inc, hm, hm_energy, prop_ttl_area)
-# boo <- boo %>% filter(low_inc == 1)
-# boo <- boo %>% filter(hm > hm_base)
-# boo$n <- boo$AHY2E001
-# boo$n <- round(boo$n * boo$prop_ttl_area)
-# sum(boo$n)
-
-
-
-
-# ## Compare to state-level and national hm values
-# (hm_natl_med <- hm_natl$hm_mean[hm_natl$status_group == "tracts_ind"])
-# (hm_tx_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Texas"])
-# (hm_nm_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "New Mexico"])
-# (hm_az_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Arizona"])
-# (hm_ca_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "California"])
-# (hm_nv_med <- hm_st$hm_mean[hm_st$status_group == "tracts_ind" & hm_st$state == "Nevada"])
-# 
-# 
-# ## What prop status grp tracts within X miles of aoi have > natl or state median hm?
-# (ttl_tracts <- sum(zone_df$hisp_chpov, na.rm = TRUE))
-# (num_tracts_gt_natl_hm_med <- sum(zone_df$hisp_chpov[zone_df$hm > hm_natl_med], na.rm = TRUE))
-# 
-# num_tracts_gt_hm_st1 <- sum(zone_df$hisp_chpov[zone_df$STATE == "Texas" &
-#                                                           zone_df$hm > hm_az_med], na.rm = TRUE)
-# num_tracts_gt_hm_st2 <- sum(zone_df$hisp_chpov[zone_df$STATE == "New Mexico" &
-#                                                           zone_df$hm > hm_nv_med], na.rm = TRUE)
-# # num_tracts_gt_hm_st3 <- sum(zone_df$non_white[zone_df$STATE == "California" &
-# #                                                         zone_df$hm > hm_ca_med], na.rm = TRUE)
-# (num_tracts_gt_state_hm <- num_tracts_gt_hm_st1 + num_tracts_gt_hm_st2)
-# # (num_tracts_gt_state_hm <- num_tracts_gt_hm_st1 + num_tracts_gt_hm_st2 + num_tracts_gt_hm_st3)
-# 95/112
-# 96/112
